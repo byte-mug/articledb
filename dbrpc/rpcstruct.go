@@ -1,3 +1,4 @@
+/*
 MIT License
 
 Copyright (c) 2017 Simon Schmidt
@@ -19,3 +20,28 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+*/
+package dbrpc
+
+import "github.com/byte-mug/golibs/serializer"
+
+type Command uint8
+const (
+	CmdZinc Command = iota
+)
+
+type Request struct{
+	Cmd Command
+}
+
+var ce_Request = serializer.With(&Request{}).
+	Field("Cmd")
+//-----------------------------------------------
+
+type Response struct{
+}
+
+var ce_Response = serializer.With(&Response{})
+//-----------------------------------------------
+
+
