@@ -21,12 +21,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
+
 package dbrpc
 
 import "github.com/byte-mug/golibs/serializer"
 import "github.com/byte-mug/articledb/groupsdb"
 import "github.com/byte-mug/articledb/messagedb"
 import "github.com/valyala/fastrpc"
+import "time"
 
 type Boolean byte
 func (b Boolean) Bool() bool { return b!=0 }
@@ -43,6 +46,10 @@ const (
 )
 func (b BITS) Has(flags BITS) bool {
 	return flags==(b&flags)
+}
+func (b BITS) Set(flags BITS,data bool) BITS {
+	if data { return b|flags }
+	return b&^flags
 }
 
 
@@ -121,7 +128,7 @@ var ce_ReqPutGroupNRT = serializer.StripawayPtrWith(new(ReqPutGroupNRT),serializ
 
 // ----------- BEGIN IGroupNRT ----------------------
 const (
-	NRT_GetGroupRTP byte = iota
+	NRT_GetGroupRTP         byte = iota
 	NRT_IncrementRTP
 	NRT_RollbackArticleRTP
 )
@@ -141,12 +148,12 @@ var ce_ReqGroupNRT = serializer.With(new(ReqGroupNRT)).
 var ce_RequestData = serializer.Switch(0).
 	AddTypeWith(0x01,new(ReqPutArticle),ce_ReqPutArticle).
 	AddTypeWith(0x02,new(ReqGetArticle),ce_ReqGetArticle).
-	AddTypeWith(0x03,new(ReqGetXover),ce_ReqGetXover).
-	
+	AddTypeWith(0x03,new(ReqGetXover  ),ce_ReqGetXover).
+
 	AddTypeWith(0x21,new(ReqGetGroupNRT),ce_ReqGetGroupNRT).
 	AddTypeWith(0x22,new(ReqGetGroupBulkNRT),ce_ReqGetGroupBulkNRT).
 	AddTypeWith(0x23,new(ReqPutGroupNRT),ce_ReqPutGroupNRT).
-	
+
 	AddTypeWith(0x30,new(ReqGroupNRT),ce_ReqGroupNRT)
 //
 
@@ -294,5 +301,115 @@ func (h *Handler) Handler(ctx fastrpc.HandlerCtx) (ctx0 fastrpc.HandlerCtx) {
 
 type Client struct{
 	Client *fastrpc.Client
+	Timeout time.Duration
 }
+
+
+
+// -----------  messagedb.IGrpArtDB -------------
+func(c *Client) PutArticle(group []byte, num int64, ap *messagedb.ArticlePosting) (ok bool){
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqPutArticle{group,num,ap}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	respo,_ := resp.Data.(*RespPutArticle)
+	if respo!=nil { return respo.Ok.Bool() }
+	return
+}
+
+func(c *Client) GetArticle(group []byte, num int64, head, body bool) (headPtr, bodyPtr messagedb.AbstractBlob, ok bool) {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqGetArticle{group,num, BITS(0).Set(BIT_HEAD,head).Set(BIT_BODY,body) }
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	respo,_ := resp.Data.(*RespGetArticle)
+	if respo==nil { return }
+	return respo.HeadPtr, respo.BodyPtr, respo.Ok.Bool()
+}
+
+func(c *Client) GetXover(group []byte, first, last int64, max int) (result []messagedb.XoverElement){
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqGetXover{group,first,last,max}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	respo,_ := resp.Data.([]messagedb.XoverElement)
+	return respo
+}
+
+
+// -----------  messagedb.IGroupNRT -------------
+func(c *Client) GetGroupNRT(group []byte) (entry *groupsdb.GroupEntryNRT) {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqGetGroupNRT{group}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	entry,_ = resp.Data.(*groupsdb.GroupEntryNRT)
+	return
+}
+func(c *Client) GetGroupBulkNRT(groups [][]byte) (entries []groupsdb.GroupPairNRT) {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqGetGroupBulkNRT{groups}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	entries,_ = resp.Data.([]groupsdb.GroupPairNRT)
+	return
+}
+func(c *Client) GetGroupsNRT(after, prefix, suffix []byte) (entries []groupsdb.GroupPairNRT) {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqGetGroupsNRT{after,prefix, suffix}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	entries,_ = resp.Data.([]groupsdb.GroupPairNRT)
+	return
+}
+func(c *Client) PutGroupNRT(group []byte, entry *groupsdb.GroupEntryNRT) (other *groupsdb.GroupEntryNRT, ok bool) {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqPutGroupNRT{group, entry}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	respo, _ := resp.Data.(*RespPutGroupNRT)
+	if respo==nil { return }
+	return respo.Other, respo.Ok.Bool()
+}
+
+
+// -----------  messagedb.IGroupRTP -------------
+func(c *Client) GetGroupRTP(group []byte) (entry *groupsdb.GroupEntryRTP) {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqGroupNRT{NRT_GetGroupRTP,group,0}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	entry,_ = resp.Data.(*groupsdb.GroupEntryRTP)
+	return
+}
+func(c *Client) IncrementRTP(group []byte) (artnum int64, ok bool) {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqGroupNRT{NRT_IncrementRTP,group,0}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	respo,_ := resp.Data.(*RespIncrementRTP)
+	if respo==nil { return }
+	return respo.Artnum,respo.Ok.Bool()
+}
+func(c *Client) RollbackArticleRTP(group []byte, artnum int64) (ok bool) {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqGroupNRT{NRT_RollbackArticleRTP,group,artnum}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	respo,_ := resp.Data.(*RespRollbackArticleRTP)
+	if respo==nil { return }
+	return respo.Ok.Bool()
+}
+
+
 
