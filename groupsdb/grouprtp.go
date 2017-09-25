@@ -21,12 +21,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
+
 package groupsdb
 
 import "github.com/boltdb/bolt"
+import "fmt"
 
 type IGroupRTP interface{
-	
+	GetGroupRTP(group []byte) (entry *GroupEntryRTP)
+	IncrementRTP(group []byte) (artnum int64,ok bool)
+	RollbackArticleRTP(group []byte,artnum int64) (ok bool)
 }
 
 var tGroupRTP = []byte("GRP.RTP")
@@ -53,13 +58,13 @@ func (g *GroupRTP) IncrementRTP(group []byte) (artnum int64,ok bool) {
 		bkt := tx.Bucket(tGroupRTP)
 		entry,err := ParseGroupEntryRTP(bkt.Get(group))
 		if err!=nil || entry==nil { entry = new(GroupEntryRTP) }
-		artnum = entry.High
-		entry.High=+artnum
+		artnum = entry.High+1
+		entry.High=artnum
 		entry.Count++
 		if entry.Low == 0 { entry.Low = artnum }
 		bkt.Put(group,entry.Bytes())
 		return nil
-	})!=nil
+	})==nil
 	return
 }
 func (g *GroupRTP) RollbackArticleRTP(group []byte,artnum int64) (ok bool) {
@@ -71,8 +76,9 @@ func (g *GroupRTP) RollbackArticleRTP(group []byte,artnum int64) (ok bool) {
 		entry.Count--
 		isHigh := entry.High==artnum
 		isLow  := entry.Low==artnum
+		fmt.Println(entry,artnum,isHigh,isLow)
 		
-		if isHigh||isLow {
+		if entry.Count<1 { // Reset count.
 			entry.High = 0
 			entry.Low  = 0
 		} else if isHigh {
@@ -82,7 +88,7 @@ func (g *GroupRTP) RollbackArticleRTP(group []byte,artnum int64) (ok bool) {
 		}
 		bkt.Put(group,entry.Bytes())
 		return nil
-	})!=nil
+	})==nil
 	return
 }
 

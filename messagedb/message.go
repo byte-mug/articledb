@@ -21,6 +21,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
+
 package messagedb
 
 import "github.com/byte-mug/golibs/serializer"
@@ -143,11 +145,19 @@ var ce_ArticleLocation = serializer.WithInline(new(ArticleLocation)).
 var ce_ArticleLocationPtr = serializer.StripawayPtrWith(new(ArticleLocation),ce_ArticleLocation)
 //-----------------------------------------------
 
-type ArticlePosing struct {
+type ArticlePosting struct {
 	Xover ArticleXover
 	Redir *ArticleRedirect
 	Head  AbstractBlob
 	Body  AbstractBlob
 }
+var ce_ArticlePosting = serializer.WithInline(new(ArticlePosting)).
+	FieldWith("Xover",ce_ArticleXoverStruct).
+	FieldWith("Redir",ce_ArticleRedirectPtr).
+	FieldWith("Head",ce_AbstractBlob).
+	FieldWith("Body",ce_AbstractBlob)
+//-----------------------------------------------
+
+func CeArticlePosting() serializer.CodecElement { return ce_ArticlePosting }
 
 

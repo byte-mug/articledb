@@ -21,6 +21,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
+
 package messagedb
 
 import "github.com/byte-mug/golibs/preciseio"
@@ -29,6 +31,9 @@ import "bytes"
 import "reflect"
 
 type IGrpArtDB interface{
+	PutArticle(group []byte,num int64, ap *ArticlePosting) (ok bool)
+	GetArticle(group []byte,num int64, head, body bool) (headPtr, bodyPtr AbstractBlob, ok bool)
+	GetXover(group []byte,first,last int64, max int) (result []XoverElement)
 }
 
 var tXover = []byte("GRP.ART.XOVER")
@@ -51,7 +56,7 @@ func (g *GrpArtDB) Initialize() error {
 	})
 }
 
-func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosing) (ok bool) {
+func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosting) (ok bool) {
 	ok = g.DB.Batch(func(tx *bolt.Tx) error {
 		buf := new(bytes.Buffer)
 		w := preciseio.PreciseWriterFromPool()
@@ -74,7 +79,7 @@ func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosing) (ok boo
 			bkt,err := xoverDB.CreateBucketIfNotExists(group)
 			if err!=nil { return err }
 			ce_ArticleXoverStruct.Write(w, reflect.ValueOf(ap.Xover))
-			bkt.Put(numbuf,buf.Bytes())
+			bkt.Put(numbuf,cloneb(buf.Bytes()))
 			buf.Reset()
 		}
 		
@@ -82,7 +87,7 @@ func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosing) (ok boo
 			bkt,err := redirDB.CreateBucketIfNotExists(group)
 			if err!=nil { return err }
 			ce_ArticleRedirect.Write(w, reflect.ValueOf(ap.Redir).Elem())
-			bkt.Put(numbuf,buf.Bytes())
+			bkt.Put(numbuf,cloneb(buf.Bytes()))
 			buf.Reset()
 		}
 		
@@ -90,7 +95,7 @@ func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosing) (ok boo
 			bkt,err := headDB.CreateBucketIfNotExists(group)
 			if err!=nil { return err }
 			ce_AbstractBlob.Write(w, reflect.ValueOf(ap.Head))
-			bkt.Put(numbuf,buf.Bytes())
+			bkt.Put(numbuf,cloneb(buf.Bytes()))
 			buf.Reset()
 		}
 		
@@ -98,7 +103,7 @@ func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosing) (ok boo
 			bkt,err := bodyDB.CreateBucketIfNotExists(group)
 			if err!=nil { return err }
 			ce_AbstractBlob.Write(w, reflect.ValueOf(ap.Body))
-			bkt.Put(numbuf,buf.Bytes())
+			bkt.Put(numbuf,cloneb(buf.Bytes()))
 			buf.Reset()
 		}
 		
@@ -106,11 +111,11 @@ func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosing) (ok boo
 			bkt,err := locaDB.CreateBucketIfNotExists(group)
 			if err!=nil { return err }
 			ce_ArticleLocation.Write(w, reflect.ValueOf(location))
-			bkt.Put(numbuf,buf.Bytes())
+			bkt.Put(numbuf,cloneb(buf.Bytes()))
 			buf.Reset()
 		}
 		return nil
-	})!=nil
+	})==nil
 	return
 }
 
@@ -119,9 +124,9 @@ func (g *GrpArtDB) GetArticle(group []byte,num int64, head, body bool) (headPtr,
 		enc := encode64(num)
 		location := new(ArticleLocation)
 		bkt := tx.Bucket(tLocal).Bucket(group)
-		if bkt==nil { return nil }
-		err := ce_ArticleLocationPtr.Read(preciseio.PreciseReader{bytes.NewReader(bkt.Get(enc))}, reflect.ValueOf(location))
-		if err!=nil { return nil }
+		if bkt!=nil {
+			ce_ArticleLocationPtr.Read(preciseio.PreciseReader{bytes.NewReader(bkt.Get(enc))}, reflect.ValueOf(location))
+		}
 		
 		if head {
 			headPtr = location.Head
@@ -164,7 +169,7 @@ func (g *GrpArtDB) GetXover(group []byte,first,last int64, max int) (result []Xo
 		for ; len(k)>0 ; k,v = c.Next() {
 			element.Number = decode64(k)
 			if element.Number>last { break }
-			err := ce_ArticleXoverStruct.Read(preciseio.PreciseReader{bytes.NewReader(xoverBuk.Get(v))}, elemXover)
+			err := ce_ArticleXoverStruct.Read(preciseio.PreciseReader{bytes.NewReader(v)}, elemXover)
 			if err!=nil { continue }
 			count--
 			result = append(result,element)
