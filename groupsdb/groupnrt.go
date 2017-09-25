@@ -32,8 +32,7 @@ type IGroupNRT interface{
 	GetGroupNRT(group []byte) (entry *GroupEntryNRT)
 	GetGroupBulkNRT(groups [][]byte) (entries []GroupPairNRT)
 	GetGroupsNRT(after, prefix, suffix []byte) (entries []GroupPairNRT)
-	UpdateGroupNRT(group []byte, entry *GroupEntryNRT) (other *GroupEntryNRT,ok bool)
-	CreateGroupNRT(group []byte, entry *GroupEntryNRT) (ok bool)
+	PutGroupNRT(group []byte, entry *GroupEntryNRT) (other *GroupEntryNRT,ok bool)
 }
 
 var tGroupNRT = []byte("GRP.NRT")
@@ -97,7 +96,24 @@ func (g *GroupNRT) GetGroupsNRT(after, prefix, suffix []byte) (entries []GroupPa
 	})
 	return
 }
-func (g *GroupNRT) UpdateGroupNRT(group []byte, entry *GroupEntryNRT) (other *GroupEntryNRT,ok bool) {
+func (g *GroupNRT) PutGroupNRT(group []byte, entry *GroupEntryNRT) (other *GroupEntryNRT,ok bool) {
+	err := g.DB.Update(func(tx *bolt.Tx) error {
+		bkt := tx.Bucket(tGroupNRT)
+		oldEntry,err := ParseGroupEntryNRT(bkt.Get(group))
+		if err!=nil || oldEntry==nil || oldEntry.TimeStamp < entry.TimeStamp {
+			err = bkt.Put(group,entry.Bytes()) // Create or Update.
+			if err!=nil { return nil }
+		}
+		ok = true
+		other = oldEntry
+		return nil
+	})
+	if err!=nil { ok = false }
+	return
+}
+
+// Deprecated!
+func (g *GroupNRT) updateGroupNRT(group []byte, entry *GroupEntryNRT) (other *GroupEntryNRT,ok bool) {
 	err := g.DB.Update(func(tx *bolt.Tx) error {
 		bkt := tx.Bucket(tGroupNRT)
 		oldEntry,err := ParseGroupEntryNRT(bkt.Get(group))
@@ -113,7 +129,8 @@ func (g *GroupNRT) UpdateGroupNRT(group []byte, entry *GroupEntryNRT) (other *Gr
 	if err!=nil { ok = false }
 	return
 }
-func (g *GroupNRT) CreateGroupNRT(group []byte, entry *GroupEntryNRT) (ok bool) {
+// Deprecated!
+func (g *GroupNRT) createGroupNRT(group []byte, entry *GroupEntryNRT) (ok bool) {
 	err := g.DB.Update(func(tx *bolt.Tx) error {
 		bkt := tx.Bucket(tGroupNRT)
 		oldEntry,err := ParseGroupEntryNRT(bkt.Get(group))

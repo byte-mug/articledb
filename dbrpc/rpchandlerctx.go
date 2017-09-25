@@ -24,57 +24,45 @@ SOFTWARE.
 package dbrpc
 
 import "github.com/byte-mug/golibs/preciseio"
-import "github.com/byte-mug/golibs/serializer"
+//import "github.com/byte-mug/golibs/serializer"
 import "github.com/valyala/fasthttp"
 import "net"
 import "bufio"
-import "sync"
-
-var pool_Writer = sync.Pool{ New: func() interface{} {
-	s := new(preciseio.PreciseWriter)
-	s.Initialize()
-	return s
-}}
-func pool_Writer_Put(w *preciseio.PreciseWriter) {
-	w.W = nil
-	pool_Writer.Put(w)
-}
+import "reflect"
 
 type HandlerCtx struct{
-	Req  *Request
-	Resp *Response
+	Req  Request
+	Resp Response
 }
 
 func (h *HandlerCtx) ConcurrencyLimitError(concurrency int) {
-	h.Resp = nil
+	h.Resp.Data = nil
 }
 
-func (h *HandlerCtx) Init(conn net.Conn, logger fasthttp.Logger) { h.Req = nil }
+func (h *HandlerCtx) Init(conn net.Conn, logger fasthttp.Logger) {
+	h.Req.Data = nil
+	h.Resp.Data = nil
+}
 
 func (h *HandlerCtx) ReadRequest(br *bufio.Reader) error {
-	r,e := serializer.Deserialize(ce_Request,preciseio.PreciseReader{br})
-	h.Req,_ = r.(*Request)
-	return e
+	return ce_Request.Read(preciseio.PreciseReader{br},reflect.ValueOf(h).Elem().Field(0))
 }
 
 func (h *HandlerCtx) WriteResponse(bw *bufio.Writer) error {
-	w := pool_Writer.Get().(*preciseio.PreciseWriter)
-	defer pool_Writer_Put(w)
+	w := preciseio.PreciseWriterFromPool()
+	defer w.PutToPool()
 	w.W = bw
-	return serializer.Serialize(ce_Response,w,h.Resp)
+	return ce_Response.Write(w,reflect.ValueOf(h).Elem().Field(1))
 }
 
 func (r *Request) WriteRequest(bw *bufio.Writer) error {
-	w := pool_Writer.Get().(*preciseio.PreciseWriter)
-	defer pool_Writer_Put(w)
+	w := preciseio.PreciseWriterFromPool()
+	defer w.PutToPool()
 	w.W = bw
-	return serializer.Serialize(ce_Request,w,r)
+	return ce_Request.Write(w,reflect.ValueOf(r).Elem())
 }
 
 func (r *Response) ReadResponse(br *bufio.Reader) error {
-	rr,e := serializer.Deserialize(ce_Response,preciseio.PreciseReader{br})
-	rp,ok := rr.(*Response)
-	if ok && rp!=nil { *r = *rp } else { *r = Response{} }
-	return e
+	return ce_Response.Read(preciseio.PreciseReader{br},reflect.ValueOf(r).Elem())
 }
 

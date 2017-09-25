@@ -43,7 +43,6 @@ type GroupEntryNRT struct{
 	TimeStamp int64 // Timestamp (UNIX-format)
 }
 func (g GroupEntryNRT) String() string {
-	//if g==nil { return "{\"\" '' 0}" }
 	return fmt.Sprintf("{%q %q %d}",g.Description,g.Status,g.TimeStamp)
 }
 
@@ -61,6 +60,17 @@ var ce_GroupEntryNRT = serializer.With(&GroupEntryNRT{}).
 	Field("TimeStamp")
 //-----------------------------------------------
 
+var ce_GroupPairNRT = serializer.WithInline(&GroupPairNRT{}).
+	Field("Key").
+	FieldWith("Value",serializer.WithInline(&GroupEntryNRT{}).
+		Field("Description").
+		Field("Status").
+		Field("TimeStamp")  )
+//-----------------------------------------------
+
+func CeGroupPairNRT() serializer.CodecElement { return ce_GroupPairNRT }
+
+
 // Group Entry, Realtime-Part
 type GroupEntryRTP struct{
 	Count int64
@@ -72,11 +82,21 @@ type GroupPairRTP struct{
 	Key []byte
 	Value GroupEntryRTP
 }
+func (g GroupPairRTP) String() string {
+	return fmt.Sprintf("{%q %v}",g.Key,g.Value)
+}
 
 var ce_GroupEntryRTP = serializer.With(&GroupEntryRTP{}).
 	Field("Count").
 	Field("Low").
 	Field("High")
 //-----------------------------------------------
+
+var ce_GroupPairRTP = serializer.WithInline(&GroupPairRTP{}).
+	Field("Key").
+	FieldWith("Value",serializer.WithInline(&GroupEntryRTP{}).Field("Count").Field("Low").Field("High"))
+//-----------------------------------------------
+
+func CeGroupPairRTP() serializer.CodecElement { return ce_GroupPairRTP }
 
 

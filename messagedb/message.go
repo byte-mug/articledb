@@ -129,10 +129,13 @@ var ce_BlobLz4Compressed = serializer.StripawayPtrWith(new(BlobLz4Compressed),
 	serializer.WithInline(new(BlobLz4Compressed)).Field("Lz4Content") )
 //
 
+func CeAbstractBlob() serializer.CodecElement { return ce_AbstractBlob }
+
 var ce_AbstractBlob = serializer.Switch(0).
 	AddTypeWith('b',new(BlobDirect),ce_BlobDirect).
 	AddTypeWith('C',new(BlobLz4Compressed),ce_BlobLz4Compressed)
 //-----------------------------------------------
+
 
 type ArticleLocation struct {
 	Head  AbstractBlob
