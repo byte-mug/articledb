@@ -220,7 +220,7 @@ var ce_RespRollbackArticleRTP = serializer.StripawayPtrWith(new(RespRollbackArti
 var ce_ResponseData = serializer.Switch(0).
 	AddTypeWith          (0x01,new(RespPutArticle),ce_RespPutArticle).
 	AddTypeWith          (0x02,new(RespGetArticle),ce_RespGetArticle).
-	AddTypeContainerWithP(0x03,new([]messagedb.XoverElement),messagedb.CeArticleXoverStruct()).
+	AddTypeContainerWithP(0x03,new([]messagedb.XoverElement),messagedb.CeXoverElement()).
 
 	AddTypeWith          (0x21,new(groupsdb.GroupEntryNRT),groupsdb.CeGroupEntryNRT()).
 	AddTypeContainerWith (0x22,[]groupsdb.GroupPairNRT{},groupsdb.CeGroupPairNRT()).

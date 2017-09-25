@@ -109,6 +109,12 @@ type XoverElement struct{
 	Xover ArticleXover
 }
 
+func CeXoverElement() serializer.CodecElement { return ce_XoverElement }
+var ce_XoverElement = serializer.WithInline(&XoverElement{}).
+	Field("Number").
+	FieldWith("Xover",ce_ArticleXoverStruct)
+//-----------------------------------------------
+
 
 
 type AbstractBlob interface{

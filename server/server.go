@@ -33,6 +33,8 @@ import "net"
 const ProtocolHeader  = "DB-RPC"
 const ProtocolVersion = 0
 
+func makeDbResponse() fastrpc.ResponseReader { return new(dbrpc.Response) }
+
 func NewServer(h *dbrpc.Handler) *fastrpc.Server {
 	srv := new(fastrpc.Server)
 	
@@ -52,11 +54,13 @@ func NewClient(addr string) *dbrpc.Client {
 	clt.CompressType    = fastrpc.CompressNone
 	clt.SniffHeader     = ProtocolHeader
 	clt.ProtocolVersion = ProtocolVersion
+	clt.NewResponse     = makeDbResponse
 	
 	clt.Addr = addr
 	
 	dc  := new(dbrpc.Client)
 	dc.Client = clt
+	dc.Initialize()
 	return dc
 }
 
@@ -66,12 +70,14 @@ func NewClientWithFunc(addr string, dial func(addr string) (net.Conn, error)) *d
 	clt.CompressType    = fastrpc.CompressNone
 	clt.SniffHeader     = ProtocolHeader
 	clt.ProtocolVersion = ProtocolVersion
+	clt.NewResponse     = makeDbResponse
 	
 	clt.Addr = addr
 	clt.Dial = dial
 	
 	dc  := new(dbrpc.Client)
 	dc.Client = clt
+	dc.Initialize()
 	return dc
 }
 

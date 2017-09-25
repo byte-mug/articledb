@@ -26,7 +26,6 @@ SOFTWARE.
 package groupsdb
 
 import "github.com/boltdb/bolt"
-import "fmt"
 
 type IGroupRTP interface{
 	GetGroupRTP(group []byte) (entry *GroupEntryRTP)
@@ -76,7 +75,6 @@ func (g *GroupRTP) RollbackArticleRTP(group []byte,artnum int64) (ok bool) {
 		entry.Count--
 		isHigh := entry.High==artnum
 		isLow  := entry.Low==artnum
-		fmt.Println(entry,artnum,isHigh,isLow)
 		
 		if entry.Count<1 { // Reset count.
 			entry.High = 0
