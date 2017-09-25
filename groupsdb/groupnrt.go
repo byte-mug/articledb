@@ -25,8 +25,10 @@ SOFTWARE.
 
 package groupsdb
 
+import "github.com/byte-mug/articledb/timeconst"
 import "github.com/boltdb/bolt"
 import "bytes"
+import "time"
 
 type IGroupNRT interface{
 	GetGroupNRT(group []byte) (entry *GroupEntryNRT)
@@ -38,8 +40,12 @@ type IGroupNRT interface{
 var tGroupNRT = []byte("GRP.NRT")
 type GroupNRT struct{
 	DB *bolt.DB
+	Timeout time.Duration
 }
 func (g *GroupNRT) Initialize() error {
+	if g.Timeout<=0 {
+		g.Timeout = timeconst.StorageTimeout
+	}
 	return g.DB.Update(func(tx *bolt.Tx) error {
 		tx.CreateBucketIfNotExists(tGroupNRT)
 		return nil
@@ -68,8 +74,9 @@ func (g *GroupNRT) GetGroupBulkNRT(groups [][]byte) (entries []GroupPairNRT) {
 	return
 }
 func (g *GroupNRT) GetGroupsNRT(after, prefix, suffix []byte) (entries []GroupPairNRT) {
-	var k,v []byte
+	tmo := time.After(g.Timeout)
 	g.DB.View(func(tx *bolt.Tx) error {
+		var k,v []byte
 		c := tx.Bucket(tGroupNRT).Cursor()
 		//var err error
 		na := after
@@ -80,8 +87,12 @@ func (g *GroupNRT) GetGroupsNRT(after, prefix, suffix []byte) (entries []GroupPa
 		} else {
 			k,v = c.First()
 		}
-		for len(k)>0 {
-			
+		for ; len(k)>0 ; k,v = c.Next() {
+			select {
+			case <-tmo:
+				return nil
+			default:
+			}
 			// -------------------------------------------------
 			if !bytes.HasPrefix(k,prefix) { break }    // We are beyond our range.
 			if !bytes.HasSuffix(k,suffix) { continue } // Wrong suffix... Skip it.
@@ -89,15 +100,13 @@ func (g *GroupNRT) GetGroupsNRT(after, prefix, suffix []byte) (entries []GroupPa
 			if err!=nil { continue }
 			entries = append(entries,GroupPairNRT{cloneb(k),*je})
 			// -------------------------------------------------
-			
-			k,v = c.Next()
 		}
 		return nil
 	})
 	return
 }
 func (g *GroupNRT) PutGroupNRT(group []byte, entry *GroupEntryNRT) (other *GroupEntryNRT,ok bool) {
-	err := g.DB.Update(func(tx *bolt.Tx) error {
+	err := g.DB.Batch(func(tx *bolt.Tx) error {
 		bkt := tx.Bucket(tGroupNRT)
 		oldEntry,err := ParseGroupEntryNRT(bkt.Get(group))
 		if err!=nil || oldEntry==nil || oldEntry.TimeStamp < entry.TimeStamp {

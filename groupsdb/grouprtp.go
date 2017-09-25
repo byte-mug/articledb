@@ -54,7 +54,7 @@ func (g *GroupRTP) GetGroupRTP(group []byte) (entry *GroupEntryRTP) {
 	return
 }
 func (g *GroupRTP) IncrementRTP(group []byte) (artnum int64,ok bool) {
-	ok = g.DB.Update(func(tx *bolt.Tx) error {
+	ok = g.DB.Batch(func(tx *bolt.Tx) error {
 		bkt := tx.Bucket(tGroupRTP)
 		entry,err := ParseGroupEntryRTP(bkt.Get(group))
 		if err!=nil || entry==nil { entry = new(GroupEntryRTP) }
@@ -68,7 +68,7 @@ func (g *GroupRTP) IncrementRTP(group []byte) (artnum int64,ok bool) {
 	return
 }
 func (g *GroupRTP) RollbackArticleRTP(group []byte,artnum int64) (ok bool) {
-	ok = g.DB.Update(func(tx *bolt.Tx) error {
+	ok = g.DB.Batch(func(tx *bolt.Tx) error {
 		bkt := tx.Bucket(tGroupRTP)
 		entry,err := ParseGroupEntryRTP(bkt.Get(group))
 		if err!=nil || entry==nil { entry = new(GroupEntryRTP) }

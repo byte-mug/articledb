@@ -25,6 +25,7 @@ SOFTWARE.
 
 package dbrpc
 
+import "github.com/byte-mug/articledb/timeconst"
 import "github.com/byte-mug/golibs/serializer"
 import "github.com/byte-mug/articledb/groupsdb"
 import "github.com/byte-mug/articledb/messagedb"
@@ -246,6 +247,7 @@ type Handler struct{
 	GroupsNRT groupsdb.IGroupNRT
 	GroupsRTP groupsdb.IGroupRTP
 }
+func (h *Handler) Create() fastrpc.HandlerCtx { return new(HandlerCtx) }
 func (h *Handler) Handler(ctx fastrpc.HandlerCtx) (ctx0 fastrpc.HandlerCtx) {
 	ctx0 = ctx
 	hctx := ctx.(*HandlerCtx)
@@ -266,7 +268,7 @@ func (h *Handler) Handler(ctx fastrpc.HandlerCtx) (ctx0 fastrpc.HandlerCtx) {
 		if h.MessageDB==nil { return }
 		hctx.Resp.Data = h.MessageDB.GetXover(v.Group, v.First, v.Last, v.Max)
 	
-	// -----------  messagedb.IGroupNRT -------------
+	// -----------  groupsdb.IGroupNRT -------------
 	case *ReqGetGroupNRT:
 		if h.GroupsNRT==nil { return }
 		hctx.Resp.Data = h.GroupsNRT.GetGroupNRT(v.Group)
@@ -281,7 +283,7 @@ func (h *Handler) Handler(ctx fastrpc.HandlerCtx) (ctx0 fastrpc.HandlerCtx) {
 		grpnrte, ok := h.GroupsNRT.PutGroupNRT(v.Group, v.Entry)
 		hctx.Resp.Data = &RespPutGroupNRT{ grpnrte, ToBoolean(ok) }
 	
-	// -----------  messagedb.IGroupRTP -------------
+	// -----------  groupsdb.IGroupRTP -------------
 	case *ReqGroupNRT:
 		if h.GroupsRTP==nil { return }
 		switch v.Cmd {
@@ -300,10 +302,20 @@ func (h *Handler) Handler(ctx fastrpc.HandlerCtx) (ctx0 fastrpc.HandlerCtx) {
 
 
 type Client struct{
-	Client *fastrpc.Client
+	Client  *fastrpc.Client
 	Timeout time.Duration
+	Write   time.Duration
 }
 
+func(c *Client) Initialize() error {
+	if c.Timeout<=0 {
+		c.Timeout = timeconst.NetworkTimeout
+	}
+	if c.Write<=0 {
+		c.Write = timeconst.WriteOverhead
+	}
+	return nil
+}
 
 
 // -----------  messagedb.IGrpArtDB -------------
@@ -311,7 +323,7 @@ func(c *Client) PutArticle(group []byte, num int64, ap *messagedb.ArticlePosting
 	req := new(Request)
 	resp := new(Response)
 	req.Data = &ReqPutArticle{group,num,ap}
-	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout+c.Write) )
 	if err!=nil { return }
 	respo,_ := resp.Data.(*RespPutArticle)
 	if respo!=nil { return respo.Ok.Bool() }
@@ -340,7 +352,7 @@ func(c *Client) GetXover(group []byte, first, last int64, max int) (result []mes
 }
 
 
-// -----------  messagedb.IGroupNRT -------------
+// -----------  groupsdb.IGroupNRT -------------
 func(c *Client) GetGroupNRT(group []byte) (entry *groupsdb.GroupEntryNRT) {
 	req := new(Request)
 	resp := new(Response)
@@ -372,7 +384,7 @@ func(c *Client) PutGroupNRT(group []byte, entry *groupsdb.GroupEntryNRT) (other 
 	req := new(Request)
 	resp := new(Response)
 	req.Data = &ReqPutGroupNRT{group, entry}
-	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout+c.Write) )
 	if err!=nil { return }
 	respo, _ := resp.Data.(*RespPutGroupNRT)
 	if respo==nil { return }
@@ -380,7 +392,7 @@ func(c *Client) PutGroupNRT(group []byte, entry *groupsdb.GroupEntryNRT) (other 
 }
 
 
-// -----------  messagedb.IGroupRTP -------------
+// -----------  groupsdb.IGroupRTP -------------
 func(c *Client) GetGroupRTP(group []byte) (entry *groupsdb.GroupEntryRTP) {
 	req := new(Request)
 	resp := new(Response)
@@ -394,7 +406,7 @@ func(c *Client) IncrementRTP(group []byte) (artnum int64, ok bool) {
 	req := new(Request)
 	resp := new(Response)
 	req.Data = &ReqGroupNRT{NRT_IncrementRTP,group,0}
-	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout+c.Write) )
 	if err!=nil { return }
 	respo,_ := resp.Data.(*RespIncrementRTP)
 	if respo==nil { return }
@@ -404,7 +416,7 @@ func(c *Client) RollbackArticleRTP(group []byte, artnum int64) (ok bool) {
 	req := new(Request)
 	resp := new(Response)
 	req.Data = &ReqGroupNRT{NRT_RollbackArticleRTP,group,artnum}
-	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout+c.Write) )
 	if err!=nil { return }
 	respo,_ := resp.Data.(*RespRollbackArticleRTP)
 	if respo==nil { return }
