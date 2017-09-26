@@ -49,3 +49,24 @@ func (c CompressionHint) Compress(b AbstractBlob) AbstractBlob {
 	return &BlobLz4Compressed{l,dest[:i]}
 }
 
+// Decompresses a blob (LZ4).
+//
+// If b is nil, it returns nil.
+// If b isn't a compressed Blob, it returns b unmodified.
+// If b is compressed, but a non-decompressible Blob (corrupted or erroneous), it returns nil.
+func Decompress(b AbstractBlob) AbstractBlob {
+	if b==nil || !b.IsDirect() { return b }
+	
+	lzb,ok := b.(*BlobLz4Compressed)
+	if !ok { return b }
+	
+	l := lzb.UCLen
+	if l>0x7E000000 { return nil }
+	buf := make([]byte,l)
+	i,e := lz4.UncompressBlock(lzb.Lz4Content,buf,0)
+	if e!=nil { return nil }
+	if i<l { buf = buf[:i] }
+	return &BlobDirect{buf}
+}
+
+

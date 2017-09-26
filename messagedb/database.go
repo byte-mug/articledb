@@ -57,8 +57,8 @@ func (g *GrpArtDB) Initialize() error {
 }
 
 func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosting) (ok bool) {
-	ap.Head = ap.HeadComp.Compress(ap.Head)
-	ap.Body = ap.BodyComp.Compress(ap.Body)
+	ap_Head := ap.HeadComp.Compress(ap.Head)
+	ap_Body := ap.BodyComp.Compress(ap.Body)
 	
 	ok = g.DB.Batch(func(tx *bolt.Tx) error {
 		buf := new(bytes.Buffer)
@@ -75,8 +75,8 @@ func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosting) (ok bo
 		
 		var location ArticleLocation
 		
-		if ap.Head!=nil && !ap.Head.IsDirect() { location.Head = ap.Head }
-		if ap.Body!=nil && !ap.Body.IsDirect() { location.Body = ap.Body }
+		if ap_Head!=nil && !ap_Head.IsDirect() { location.Head = ap_Head }
+		if ap_Body!=nil && !ap_Body.IsDirect() { location.Body = ap_Body }
 		
 		{
 			bkt,err := xoverDB.CreateBucketIfNotExists(group)
@@ -94,18 +94,18 @@ func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosting) (ok bo
 			buf.Reset()
 		}
 		
-		if ap.Head!=nil && location.Head==nil {
+		if ap_Head!=nil && location.Head==nil {
 			bkt,err := headDB.CreateBucketIfNotExists(group)
 			if err!=nil { return err }
-			ce_AbstractBlob.Write(w, reflect.ValueOf(ap.Head))
+			ce_AbstractBlob.Write(w, reflect.ValueOf(ap_Head))
 			bkt.Put(numbuf,cloneb(buf.Bytes()))
 			buf.Reset()
 		}
 		
-		if ap.Body!=nil && location.Body==nil {
+		if ap_Body!=nil && location.Body==nil {
 			bkt,err := bodyDB.CreateBucketIfNotExists(group)
 			if err!=nil { return err }
-			ce_AbstractBlob.Write(w, reflect.ValueOf(ap.Body))
+			ce_AbstractBlob.Write(w, reflect.ValueOf(ap_Body))
 			bkt.Put(numbuf,cloneb(buf.Bytes()))
 			buf.Reset()
 		}

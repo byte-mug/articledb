@@ -25,6 +25,7 @@ SOFTWARE.
 
 package dbrpc
 
+import "github.com/nu7hatch/gouuid"
 import "github.com/byte-mug/articledb/timeconst"
 import "github.com/byte-mug/golibs/serializer"
 import "github.com/byte-mug/articledb/groupsdb"
@@ -94,6 +95,39 @@ var ce_ReqGetXover = serializer.StripawayPtrWith(new(ReqGetXover),serializer.Wit
 
 // ----------- END IGrpArtDB ----------------------
 
+// ----------- BEGIN IDayfileNode ----------------------
+
+const (
+	DF_NodeID       byte = iota
+	DF_FreeStorage
+)
+type ReqDayfileNodeInfo struct{
+	Cmd byte
+}
+var ce_ReqDayfileNodeInfo = serializer.StripawayPtrWith(new(ReqDayfileNodeInfo),serializer.WithInline(new(ReqDayfileNodeInfo)).
+	Field("Cmd"))
+//
+
+type ReqAddDayfileBlob struct{
+	DayID int
+	Comp  messagedb.CompressionHint
+	Data  messagedb.AbstractBlob
+}
+var ce_ReqAddDayfileBlob = serializer.StripawayPtrWith(new(ReqAddDayfileBlob),serializer.WithInline(new(ReqAddDayfileBlob)).
+	Field("DayID").
+	Field("Comp").
+	FieldWith("Data",messagedb.CeAbstractBlob()))
+//
+
+type ReqReadDayfileBlob struct{
+	Data  messagedb.AbstractBlob
+}
+var ce_ReqReadDayfileBlob = serializer.StripawayPtrWith(new(ReqReadDayfileBlob),serializer.WithInline(new(ReqReadDayfileBlob)).
+	FieldWith("Data",messagedb.CeAbstractBlob()))
+//
+
+// ----------- END IDayfileNode ----------------------
+
 // ----------- BEGIN IGroupNRT ----------------------
 type ReqGetGroupNRT struct{
 	Group []byte
@@ -144,6 +178,28 @@ var ce_ReqGroupRTP = serializer.With(new(ReqGroupRTP)).
 	Field("Artnum")
 // ----------- End IGroupRTP ----------------------
 
+// ----------- BEGIN IMsgidIndexDB ----------------------
+
+type ReqGetMessageLocation struct{
+	MessageID []byte
+}
+var ce_ReqGetMessageLocation = serializer.StripawayPtrWith(new(ReqGetMessageLocation),serializer.WithInline(new(ReqGetMessageLocation)).
+	Field("MessageID"))
+//
+
+type ReqUpdateMessageLocation struct{
+	MessageID []byte
+	ArticlePos *messagedb.ArticleRedirect
+	Timestamp int64
+}
+var ce_ReqUpdateMessageLocation = serializer.StripawayPtrWith(new(ReqUpdateMessageLocation),serializer.WithInline(new(ReqUpdateMessageLocation)).
+	Field("MessageID").
+	FieldWith("ArticlePos",messagedb.CeArticleRedirectPtr()).
+	Field("Timestamp"))
+//
+
+// ----------- END IMsgidIndexDB ----------------------
+
 
 
 var ce_RequestData = serializer.Switch(0).
@@ -151,12 +207,19 @@ var ce_RequestData = serializer.Switch(0).
 	AddTypeWith(0x02,new(ReqGetArticle),ce_ReqGetArticle).
 	AddTypeWith(0x03,new(ReqGetXover  ),ce_ReqGetXover).
 
+	AddTypeWith(0x11,new(ReqDayfileNodeInfo),ce_ReqDayfileNodeInfo).
+	AddTypeWith(0x12,new(ReqAddDayfileBlob),ce_ReqAddDayfileBlob).
+	AddTypeWith(0x13,new(ReqReadDayfileBlob),ce_ReqReadDayfileBlob).
+
 	AddTypeWith(0x21,new(ReqGetGroupNRT),ce_ReqGetGroupNRT).
 	AddTypeWith(0x22,new(ReqGetGroupBulkNRT),ce_ReqGetGroupBulkNRT).
 	AddTypeWith(0x23,new(ReqPutGroupNRT),ce_ReqPutGroupNRT).
 	AddTypeWith(0x24,new(ReqGetGroupsNRT),ce_ReqGetGroupsNRT).
 
-	AddTypeWith(0x30,new(ReqGroupRTP),ce_ReqGroupRTP)
+	AddTypeWith(0x30,new(ReqGroupRTP),ce_ReqGroupRTP).
+
+	AddTypeWith(0x41,new(ReqGetMessageLocation),ce_ReqGetMessageLocation).
+	AddTypeWith(0x42,new(ReqUpdateMessageLocation),ce_ReqUpdateMessageLocation)
 //
 
 
@@ -191,6 +254,23 @@ var ce_RespGetArticle = serializer.StripawayPtrWith(new(RespGetArticle),serializ
 
 // ----------- END IGrpArtDB ----------------------
 
+// ----------- BEGIN IDayfileNode ----------------------
+type RespFreeDayfileStorage struct{
+	FreeStorage int64
+}
+var ce_RespFreeDayfileStorage = serializer.StripawayPtrWith(new(RespFreeDayfileStorage),serializer.WithInline(new(RespFreeDayfileStorage)).
+	Field("FreeStorage"))
+//
+
+type RespDayfileBlob struct{
+	Data  messagedb.AbstractBlob
+}
+var ce_RespDayfileBlob = serializer.StripawayPtrWith(new(RespDayfileBlob),serializer.WithInline(new(RespDayfileBlob)).
+	FieldWith("Data",messagedb.CeAbstractBlob()))
+//
+
+// ----------- END IDayfileNode ----------------------
+
 // ----------- BEGIN IGroupNRT ----------------------
 
 type RespPutGroupNRT struct{
@@ -217,11 +297,14 @@ var ce_RespRollbackArticleRTP = serializer.StripawayPtrWith(new(RespRollbackArti
 	Field("Ok"))
 // ----------- END IGroupRTP ----------------------
 
-
 var ce_ResponseData = serializer.Switch(0).
 	AddTypeWith          (0x01,new(RespPutArticle),ce_RespPutArticle).
 	AddTypeWith          (0x02,new(RespGetArticle),ce_RespGetArticle).
 	AddTypeContainerWithP(0x03,new([]messagedb.XoverElement),messagedb.CeXoverElement()).
+
+	AddTypeWith          (0x11,new(RespFreeDayfileStorage),ce_RespFreeDayfileStorage).
+	AddTypeWith          (0x12,new(RespDayfileBlob),ce_RespDayfileBlob).
+	AddTypeWith          (0x13,new(uuid.UUID),serializer.StripawayPtr(new(uuid.UUID))).
 
 	AddTypeWith          (0x21,new(groupsdb.GroupEntryNRT),groupsdb.CeGroupEntryNRT()).
 	AddTypeContainerWith (0x22,[]groupsdb.GroupPairNRT{},groupsdb.CeGroupPairNRT()).
@@ -229,7 +312,9 @@ var ce_ResponseData = serializer.Switch(0).
 
 	AddTypeWith          (0x31,new(groupsdb.GroupEntryRTP),groupsdb.CeGroupEntryRTP()).
 	AddTypeWith          (0x32,new(RespIncrementRTP),ce_RespIncrementRTP).
-	AddTypeWith          (0x33,new(RespRollbackArticleRTP),ce_RespRollbackArticleRTP)
+	AddTypeWith          (0x33,new(RespRollbackArticleRTP),ce_RespRollbackArticleRTP).
+	
+	AddTypeWith          (0x41,new(messagedb.ArticleRedirect),messagedb.CeArticleRedirectPtr())
 //
 
 
@@ -245,8 +330,10 @@ var ce_Response = serializer.WithInline(&Response{}).
 
 type Handler struct{
 	MessageDB messagedb.IGrpArtDB
+	DayfileDB messagedb.IDayfileNode
 	GroupsNRT groupsdb.IGroupNRT
 	GroupsRTP groupsdb.IGroupRTP
+	MessageID messagedb.IMsgidIndexDB
 }
 func (h *Handler) Create() fastrpc.HandlerCtx { return new(HandlerCtx) }
 func (h *Handler) Handler(ctx fastrpc.HandlerCtx) (ctx0 fastrpc.HandlerCtx) {
@@ -268,6 +355,23 @@ func (h *Handler) Handler(ctx fastrpc.HandlerCtx) (ctx0 fastrpc.HandlerCtx) {
 	case *ReqGetXover:
 		if h.MessageDB==nil { return }
 		hctx.Resp.Data = h.MessageDB.GetXover(v.Group, v.First, v.Last, v.Max)
+	
+	// -----------  messagedb.IDayfileNode -------------
+	case *ReqDayfileNodeInfo:
+		if h.DayfileDB==nil { return }
+		switch v.Cmd {
+		case DF_NodeID:
+			hctx.Resp.Data = h.DayfileDB.GetDayfileNodeID()
+		case DF_FreeStorage:
+			hctx.Resp.Data = &RespFreeDayfileStorage{ h.DayfileDB.FreeDayfileStorage() }
+		}
+	case *ReqAddDayfileBlob:
+		if h.DayfileDB==nil { return }
+		hctx.Resp.Data = &RespDayfileBlob{h.DayfileDB.AddDayfileBlob(v.DayID,v.Comp,v.Data)}
+		
+	case *ReqReadDayfileBlob:
+		if h.DayfileDB==nil { return }
+		hctx.Resp.Data = &RespDayfileBlob{h.DayfileDB.ReadDayfileBlob(v.Data)}
 	
 	// -----------  groupsdb.IGroupNRT -------------
 	case *ReqGetGroupNRT:
@@ -297,6 +401,14 @@ func (h *Handler) Handler(ctx fastrpc.HandlerCtx) (ctx0 fastrpc.HandlerCtx) {
 			hctx.Resp.Data = &RespRollbackArticleRTP{
 				ToBoolean(h.GroupsRTP.RollbackArticleRTP(v.Group,v.Artnum))}
 		}
+	// -----------  messagedb.IMsgidIndexDB -------------
+	case *ReqGetMessageLocation:
+		if h.MessageID==nil { return }
+		hctx.Resp.Data = h.MessageID.GetMessageLocation(v.MessageID)
+	case *ReqUpdateMessageLocation:
+		if h.MessageID==nil { return }
+		hctx.Resp.Data = &RespRollbackArticleRTP{ // Reuse datatype
+			ToBoolean(h.MessageID.UpdateMessageLocation(v.MessageID,v.ArticlePos,v.Timestamp))}
 	}
 	return
 }
@@ -352,8 +464,49 @@ func(c *Client) GetXover(group []byte, first, last int64, max int) (result []mes
 	return respo
 }
 
+// -----------  messagedb.IDayfileNode -------------
+
+func(c *Client) GetDayfileNodeID() *uuid.UUID {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqDayfileNodeInfo{DF_NodeID}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return nil }
+	respo,_ := resp.Data.(*uuid.UUID)
+	return respo
+}
+func(c *Client) FreeDayfileStorage() int64 {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqDayfileNodeInfo{DF_FreeStorage}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return 0 }
+	respo,_ := resp.Data.(*RespFreeDayfileStorage)
+	if respo==nil { return 0 }
+	return respo.FreeStorage
+}
+func(c *Client) AddDayfileBlob(dayid int, ch messagedb.CompressionHint, b messagedb.AbstractBlob) messagedb.AbstractBlob {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqAddDayfileBlob{dayid,ch,b}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout+c.Write) )
+	if err!=nil { return nil }
+	respo,_ := resp.Data.(*RespDayfileBlob)
+	if respo==nil { return nil }
+	return respo.Data
+}
+func(c *Client) ReadDayfileBlob(b messagedb.AbstractBlob) messagedb.AbstractBlob {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqReadDayfileBlob{b}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return nil }
+	respo,_ := resp.Data.(*RespDayfileBlob)
+	return respo.Data
+}
 
 // -----------  groupsdb.IGroupNRT -------------
+
 func(c *Client) GetGroupNRT(group []byte) (entry *groupsdb.GroupEntryNRT) {
 	req := new(Request)
 	resp := new(Response)
@@ -394,6 +547,7 @@ func(c *Client) PutGroupNRT(group []byte, entry *groupsdb.GroupEntryNRT) (other 
 
 
 // -----------  groupsdb.IGroupRTP -------------
+
 func(c *Client) GetGroupRTP(group []byte) (entry *groupsdb.GroupEntryRTP) {
 	req := new(Request)
 	resp := new(Response)
@@ -424,5 +578,27 @@ func(c *Client) RollbackArticleRTP(group []byte, artnum int64) (ok bool) {
 	return respo.Ok.Bool()
 }
 
+// -----------  messagedb.IMsgidIndexDB -------------
+
+func(c *Client) GetMessageLocation(messageID []byte) (articlePos *messagedb.ArticleRedirect) {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqGetMessageLocation{messageID}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
+	if err!=nil { return }
+	articlePos,_ = resp.Data.(*messagedb.ArticleRedirect)
+	return
+}
+
+func(c *Client) UpdateMessageLocation(messageID []byte,articlePos *messagedb.ArticleRedirect,timestamp int64) (ok bool) {
+	req := new(Request)
+	resp := new(Response)
+	req.Data = &ReqUpdateMessageLocation{messageID,articlePos,timestamp}
+	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout+c.Write) )
+	if err!=nil { return }
+	respo,_ := resp.Data.(*RespRollbackArticleRTP)
+	if respo==nil { return }
+	return respo.Ok.Bool()
+}
 
 

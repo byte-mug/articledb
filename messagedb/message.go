@@ -26,6 +26,7 @@ SOFTWARE.
 package messagedb
 
 import "github.com/byte-mug/golibs/serializer"
+import "github.com/nu7hatch/gouuid"
 
 func cloneb(i []byte) (j []byte) {
 	j = make([]byte,len(i))
@@ -106,6 +107,7 @@ type ArticleRedirect struct {
 	Number int64
 }
 
+func CeArticleRedirectPtr() serializer.CodecElement { return ce_ArticleRedirectPtr }
 var ce_ArticleRedirectPtr = serializer.With(&ArticleRedirect{}).
 	Field("Group").
 	Field("Number")
@@ -151,11 +153,30 @@ var ce_BlobLz4Compressed = serializer.StripawayPtrWith(new(BlobLz4Compressed),
 	serializer.WithInline(new(BlobLz4Compressed)).Field("UCLen").Field("Lz4Content") )
 //
 
+
+type BlobLocation struct{
+	Node *uuid.UUID
+	DayID int
+	Offset int64
+	Length int64
+}
+func (b *BlobLocation) IsDirect() bool { return false }
+
+var ce_BlobLocation = serializer.StripawayPtrWith(new(BlobLocation),
+	serializer.WithInline(new(BlobLocation)).
+	FieldWith("Node",serializer.StripawayPtr(new(uuid.UUID))).
+	Field("DayID").
+	Field("Offset").
+	Field("Length") )
+//
+
+
 func CeAbstractBlob() serializer.CodecElement { return ce_AbstractBlob }
 
 var ce_AbstractBlob = serializer.Switch(0).
 	AddTypeWith('b',new(BlobDirect),ce_BlobDirect).
-	AddTypeWith('C',new(BlobLz4Compressed),ce_BlobLz4Compressed)
+	AddTypeWith('C',new(BlobLz4Compressed),ce_BlobLz4Compressed).
+	AddTypeWith('L',new(BlobLocation),ce_BlobLocation)
 //-----------------------------------------------
 
 
