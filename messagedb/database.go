@@ -57,6 +57,9 @@ func (g *GrpArtDB) Initialize() error {
 }
 
 func (g *GrpArtDB) PutArticle(group []byte,num int64, ap *ArticlePosting) (ok bool) {
+	ap.Head = ap.HeadComp.Compress(ap.Head)
+	ap.Body = ap.BodyComp.Compress(ap.Body)
+	
 	ok = g.DB.Batch(func(tx *bolt.Tx) error {
 		buf := new(bytes.Buffer)
 		w := preciseio.PreciseWriterFromPool()

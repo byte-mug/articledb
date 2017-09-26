@@ -129,16 +129,16 @@ var ce_ReqPutGroupNRT = serializer.StripawayPtrWith(new(ReqPutGroupNRT),serializ
 
 // ----------- BEGIN IGroupNRT ----------------------
 const (
-	NRT_GetGroupRTP         byte = iota
-	NRT_IncrementRTP
-	NRT_RollbackArticleRTP
+	RTP_GetGroupRTP         byte = iota
+	RTP_IncrementRTP
+	RTP_RollbackArticleRTP
 )
-type ReqGroupNRT struct{
+type ReqGroupRTP struct{
 	Cmd    byte
 	Group  []byte
 	Artnum int64
 }
-var ce_ReqGroupNRT = serializer.With(new(ReqGroupNRT)).
+var ce_ReqGroupRTP = serializer.With(new(ReqGroupRTP)).
 	Field("Cmd").
 	Field("Group").
 	Field("Artnum")
@@ -154,8 +154,9 @@ var ce_RequestData = serializer.Switch(0).
 	AddTypeWith(0x21,new(ReqGetGroupNRT),ce_ReqGetGroupNRT).
 	AddTypeWith(0x22,new(ReqGetGroupBulkNRT),ce_ReqGetGroupBulkNRT).
 	AddTypeWith(0x23,new(ReqPutGroupNRT),ce_ReqPutGroupNRT).
+	AddTypeWith(0x24,new(ReqGetGroupsNRT),ce_ReqGetGroupsNRT).
 
-	AddTypeWith(0x30,new(ReqGroupNRT),ce_ReqGroupNRT)
+	AddTypeWith(0x30,new(ReqGroupRTP),ce_ReqGroupRTP)
 //
 
 
@@ -284,15 +285,15 @@ func (h *Handler) Handler(ctx fastrpc.HandlerCtx) (ctx0 fastrpc.HandlerCtx) {
 		hctx.Resp.Data = &RespPutGroupNRT{ grpnrte, ToBoolean(ok) }
 	
 	// -----------  groupsdb.IGroupRTP -------------
-	case *ReqGroupNRT:
+	case *ReqGroupRTP:
 		if h.GroupsRTP==nil { return }
 		switch v.Cmd {
-		case NRT_GetGroupRTP:
+		case RTP_GetGroupRTP:
 			hctx.Resp.Data = h.GroupsRTP.GetGroupRTP(v.Group)
-		case NRT_IncrementRTP:
+		case RTP_IncrementRTP:
 			nartnum, ok := h.GroupsRTP.IncrementRTP(v.Group)
 			hctx.Resp.Data = &RespIncrementRTP{ nartnum, ToBoolean(ok) }
-		case NRT_RollbackArticleRTP:
+		case RTP_RollbackArticleRTP:
 			hctx.Resp.Data = &RespRollbackArticleRTP{
 				ToBoolean(h.GroupsRTP.RollbackArticleRTP(v.Group,v.Artnum))}
 		}
@@ -396,7 +397,7 @@ func(c *Client) PutGroupNRT(group []byte, entry *groupsdb.GroupEntryNRT) (other 
 func(c *Client) GetGroupRTP(group []byte) (entry *groupsdb.GroupEntryRTP) {
 	req := new(Request)
 	resp := new(Response)
-	req.Data = &ReqGroupNRT{NRT_GetGroupRTP,group,0}
+	req.Data = &ReqGroupRTP{RTP_GetGroupRTP,group,0}
 	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout) )
 	if err!=nil { return }
 	entry,_ = resp.Data.(*groupsdb.GroupEntryRTP)
@@ -405,7 +406,7 @@ func(c *Client) GetGroupRTP(group []byte) (entry *groupsdb.GroupEntryRTP) {
 func(c *Client) IncrementRTP(group []byte) (artnum int64, ok bool) {
 	req := new(Request)
 	resp := new(Response)
-	req.Data = &ReqGroupNRT{NRT_IncrementRTP,group,0}
+	req.Data = &ReqGroupRTP{RTP_IncrementRTP,group,0}
 	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout+c.Write) )
 	if err!=nil { return }
 	respo,_ := resp.Data.(*RespIncrementRTP)
@@ -415,7 +416,7 @@ func(c *Client) IncrementRTP(group []byte) (artnum int64, ok bool) {
 func(c *Client) RollbackArticleRTP(group []byte, artnum int64) (ok bool) {
 	req := new(Request)
 	resp := new(Response)
-	req.Data = &ReqGroupNRT{NRT_RollbackArticleRTP,group,artnum}
+	req.Data = &ReqGroupRTP{RTP_RollbackArticleRTP,group,artnum}
 	err := c.Client.DoDeadline(req, resp, time.Now().Add(c.Timeout+c.Write) )
 	if err!=nil { return }
 	respo,_ := resp.Data.(*RespRollbackArticleRTP)

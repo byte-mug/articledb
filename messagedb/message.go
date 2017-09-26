@@ -49,6 +49,19 @@ func decode64(buf []byte) (r int64) {
 	return
 }
 
+type CompressionHint byte
+const (
+	CH_None   CompressionHint = 0
+	CH_LZ4    CompressionHint = 'z'
+	CH_LZ4_HC CompressionHint = 'H'
+)
+func (c CompressionHint) UseLz4() bool {
+	switch c {
+	case CH_LZ4,CH_LZ4_HC: return true
+	}
+	return false
+}
+func (c CompressionHint) Lz4UseHC() bool { return c==CH_LZ4_HC }
 
 
 type ArticleXover struct {
@@ -128,11 +141,14 @@ var ce_BlobDirect = serializer.StripawayPtrWith(new(BlobDirect),
 	serializer.WithInline(new(BlobDirect)).Field("Content") )
 //
 
-type BlobLz4Compressed struct{ Lz4Content []byte }
+type BlobLz4Compressed struct{
+	UCLen int
+	Lz4Content []byte
+}
 func (b *BlobLz4Compressed) IsDirect() bool { return true }
 
 var ce_BlobLz4Compressed = serializer.StripawayPtrWith(new(BlobLz4Compressed),
-	serializer.WithInline(new(BlobLz4Compressed)).Field("Lz4Content") )
+	serializer.WithInline(new(BlobLz4Compressed)).Field("UCLen").Field("Lz4Content") )
 //
 
 func CeAbstractBlob() serializer.CodecElement { return ce_AbstractBlob }
@@ -155,14 +171,20 @@ var ce_ArticleLocationPtr = serializer.StripawayPtrWith(new(ArticleLocation),ce_
 //-----------------------------------------------
 
 type ArticlePosting struct {
-	Xover ArticleXover
-	Redir *ArticleRedirect
-	Head  AbstractBlob
-	Body  AbstractBlob
+	Xover    ArticleXover
+	Redir    *ArticleRedirect
+	Head     AbstractBlob
+	Body     AbstractBlob
+	
+	// Compression hints.
+	HeadComp CompressionHint
+	BodyComp CompressionHint
 }
 var ce_ArticlePosting = serializer.WithInline(new(ArticlePosting)).
 	FieldWith("Xover",ce_ArticleXoverStruct).
 	FieldWith("Redir",ce_ArticleRedirectPtr).
+	Field("HeadComp").
+	Field("BodyComp").
 	FieldWith("Head",ce_AbstractBlob).
 	FieldWith("Body",ce_AbstractBlob)
 //-----------------------------------------------
